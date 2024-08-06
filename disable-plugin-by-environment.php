@@ -18,36 +18,37 @@ if ( ! defined( 'ABSPATH' ) ) {
 // Global vars
 define('PLUGIN_NAME', 'Disable Plugin by Environment');
 define('PLUGIN_SLUG', 'disable-plugin-by-environment');
+define('PLUGIN_PREFIX', 'dpbe_');
 
 class Disable_Plugin_By_Env {
 
     public function init() {
-        add_action('admin_init', array($this, 'dpbe_register_settings'));
-        add_action('admin_menu', array($this, 'dpbe_settings_page'));
+        add_action('admin_init', array($this, PLUGIN_PREFIX . 'register_settings'));
+        add_action('admin_menu', array($this, PLUGIN_PREFIX . 'settings_page'));
     }
 
     public function dpbe_register_settings() {
         // Register the setting and the validation callback
         register_setting(
-            'dpbe_example_plugin_options',    // Option group
-            'dpbe_example_plugin_options',    // Option name in the database
-            array($this, 'dpbe_example_plugin_options_validate') // Validation callback
+            PLUGIN_PREFIX . 'example_plugin_options',    // Option group
+            PLUGIN_PREFIX . 'example_plugin_options',    // Option name in the database
+            array($this, PLUGIN_PREFIX . 'example_plugin_options_validate') // Validation callback
         );
 
         // Add the settings section
         add_settings_section(
             'api_settings',                    // Section ID
             'API Settings',                    // Title of the section
-            array($this, 'dpbe_plugin_section_text'),  // Callback to output the description
-            'dpbe_example_plugin'               // Page on which the section appears
+            array($this, PLUGIN_PREFIX . 'plugin_section_text'),  // Callback to output the description
+            PLUGIN_PREFIX . 'example_plugin'               // Page on which the section appears
         );
 
         // Add the settings field
         add_settings_field(
-            'dpbe_plugin_setting_api_key',      // Field ID
+            PLUGIN_PREFIX . 'plugin_setting_api_key',      // Field ID
             'API Key',                         // Field title
-            array($this, 'dpbe_plugin_setting_api_key'),  // Callback to output the form field
-            'dpbe_example_plugin',              // Page on which the field appears
+            array($this, PLUGIN_PREFIX . 'plugin_setting_api_key'),  // Callback to output the form field
+            PLUGIN_PREFIX . 'example_plugin',              // Page on which the field appears
             'api_settings'                     // Section in which the field appears
         );
     }
@@ -58,14 +59,14 @@ class Disable_Plugin_By_Env {
             PLUGIN_NAME,
             'manage_options',
             PLUGIN_SLUG,
-            array($this, 'dpbe_settings_page_html')
+            array($this, PLUGIN_PREFIX . 'settings_page_html')
         );
     }
 
     public function dpbe_settings_page_html() {
         if (!current_user_can('manage_options')) return;
 
-        $options = get_option('dpbe_example_plugin_options');
+        $options = get_option(PLUGIN_PREFIX . 'example_plugin_options');
 
         print_r($options);
         ?>
@@ -75,8 +76,8 @@ class Disable_Plugin_By_Env {
             <h2><?php echo PLUGIN_NAME; ?></h2>
             <form action="options.php" method="post">
                 <?php 
-                settings_fields('dpbe_example_plugin_options');
-                do_settings_sections('dpbe_example_plugin');
+                settings_fields(PLUGIN_PREFIX . 'example_plugin_options');
+                do_settings_sections(PLUGIN_PREFIX . 'example_plugin');
                 ?>
                 <input name="submit" class="button button-primary" type="submit" value="<?php esc_attr_e('Save'); ?>" />
             </form>
@@ -89,9 +90,9 @@ class Disable_Plugin_By_Env {
     }
 
     public function dpbe_plugin_setting_api_key() {
-        $options = get_option('dpbe_example_plugin_options');
+        $options = get_option(PLUGIN_PREFIX . 'example_plugin_options');
         $api_key = isset($options['api_key']) ? $options['api_key'] : '';
-        echo "<input id='dpbe_plugin_setting_api_key' name='dpbe_example_plugin_options[api_key]' type='text' value='" . esc_attr($api_key) . "' />";
+        echo "<input id='" . PLUGIN_PREFIX . "plugin_setting_api_key' name='"  . PLUGIN_PREFIX .  "example_plugin_options[api_key]' type='text' value='" . esc_attr($api_key) . "' />";
     }
 
     public function dpbe_example_plugin_options_validate($input) {
