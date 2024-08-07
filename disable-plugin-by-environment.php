@@ -21,10 +21,25 @@ define('PLUGIN_SLUG', 'disable-plugin-by-environment');
 define('PLUGIN_PREFIX', 'dpbe_');
 
 class Disable_Plugin_By_Env {
-
     public function init() {
+        add_action('init', array($this, PLUGIN_PREFIX . 'deactivate_plugins'));
         add_action('admin_menu', array($this, PLUGIN_PREFIX . 'settings_page'));
         add_action('admin_post_' . PLUGIN_PREFIX . 'save_settings', array($this, PLUGIN_PREFIX . 'save_settings'));
+    }
+
+   public function dpbe_deactivate_plugins() {
+    $options = get_option(PLUGIN_PREFIX . 'plugin_activation_status');
+    $deactivated_plugins_keys = isset($options['deactivated_plugins']) ? array_keys($options['deactivated_plugins']) : array();
+    $all_plugins = get_plugins();
+    $all_plugins_keys = array_keys($all_plugins);
+
+    foreach ($all_plugins_keys as $plugin_key) {
+        if (in_array($plugin_key, $deactivated_plugins_keys) && is_plugin_active($plugin_key)) {
+            deactivate_plugins($plugin_key, false, is_network_admin());
+        } elseif (!in_array($plugin_key, $deactivated_plugins_keys) && !is_plugin_active($plugin_key)) {
+            activate_plugin($plugin_key, '', is_network_admin());
+        }
+    }
     }
 
     public function dpbe_settings_page() {
@@ -38,16 +53,24 @@ class Disable_Plugin_By_Env {
     }
 
     public function dpbe_settings_page_html() {
-        if (!current_user_can('manage_options')) return;
+        if (!current_user_can('manage_options')) {
+         return;
+        }
 
         $options = get_option(PLUGIN_PREFIX . 'plugin_activation_status');
+        $deactivated_plugins_arr = $options['deactivated_plugins'];
+        $deactivated_plugins_keys = array_keys($deactivated_plugins_arr);
+
+        $option_test = get_option('asdkfjdasfkadsjfkdsjfds');
         ?>
         <div class="wrap">
          <h2><?php echo PLUGIN_NAME; ?></h2>
          <?php
          echo '<pre>';
-         echo print_r($options);
+         echo print_r($deactivated_plugins_keys);
          echo '</pre>';
+
+         var_dump($option_test);
          ?>
 
          <?php if (isset($_GET['status']) && $_GET['status'] == 'success'): ?>
@@ -69,16 +92,22 @@ class Disable_Plugin_By_Env {
     }
 
     public function dpbe_plugin_activation_state($options) {
-        $deactivated_plugins_arr = get_plugins();
+        $all_plugins = get_plugins();
 
-        foreach ($deactivated_plugins_arr as $plugin_file => $plugin_data) {
+        echo '<pre>';
+        print_r($all_plugins);
+        echo '</pre>';
+
+        foreach ($all_plugins as $plugin_file => $plugin_data) {
             $checked = isset($options['deactivated_plugins'][$plugin_file]) && $options['deactivated_plugins'][$plugin_file] ? 'checked="checked"' : '';
             echo "<p><label><input id='" . PLUGIN_PREFIX . "plugin_activation_status' name='" . PLUGIN_PREFIX . "plugin_activation_status[deactivated_plugins][" . esc_attr($plugin_file) . "]' type='checkbox' value='1' $checked /> " . esc_html($plugin_data['Name']) . "</label></p>";
         }
     }
 
     public function dpbe_save_settings() {
-        if (!current_user_can('manage_options')) return;
+        if (!current_user_can('manage_options')) {
+         return;
+        }
 
         // Verify nonce
         if (!isset($_POST['_wpnonce']) || !wp_verify_nonce($_POST['_wpnonce'], PLUGIN_PREFIX . 'save_settings_nonce')) {
