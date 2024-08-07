@@ -59,18 +59,18 @@ public function dpbe_deactivate_plugins() {
   }
 
   $options = get_option(PLUGIN_PREFIX . 'plugin_activation_status');
-
-  echo '<pre>';
-  print_r($options);
-  echo '</pre>';
   ?>
   <div class="wrap">
    <h2><?php echo PLUGIN_NAME; ?></h2>
 
    <?php if (isset($_GET['status']) && $_GET['status'] == 'success'): ?>
-       <div id="message" class="updated notice notice-success is-dismissible">
-           <p><?php _e('Settings saved successfully.'); ?></p>
-       </div>
+    <div id="message" class="updated notice notice-success is-dismissible">
+        <p><?php _e('Settings saved successfully.', 'disable-plugin-by-environment'); ?></p>
+    </div>
+   <?php elseif (isset($_GET['status']) && $_GET['status'] == 'error'): ?>
+    <div id="message" class="error notice notice-error is-dismissible">
+        <p><?php _e('Invalid input. Please ensure each line contains a full URL.', 'disable-plugin-by-environment'); ?></p>
+    </div>
    <?php endif; ?>
 
    <form action="<?php echo esc_url(admin_url('admin-post.php')); ?>" method="post">
@@ -91,6 +91,8 @@ public function dpbe_deactivate_plugins() {
 
  public function dpbe_environments($options) {
   $environments = isset($options['environments']) ? esc_textarea($options['environments']) : ''; // Retrieve saved environments
+
+  $error_class = (isset($_GET['status']) && $_GET['status'] == 'error') ? 'error notice notice-error' : '';
   ?>
   <h3>Environments Where Plugins will be Deactivated</h3>
   
@@ -106,8 +108,8 @@ public function dpbe_deactivate_plugins() {
     </li>
    </ol>
   </div>
-
-  <textarea name="<?php echo PLUGIN_PREFIX; ?>environments" id="<?php echo PLUGIN_PREFIX; ?>environments" cols="50" rows="6"><?php echo $environments; ?></textarea>
+  
+  <textarea name="<?php echo PLUGIN_PREFIX; ?>environments" id="<?php echo PLUGIN_PREFIX; ?>environments" cols="50" rows="6" class="<?php echo $error_class; ?>"><?php echo $environments; ?></textarea>
   <?php
  }
 
@@ -127,24 +129,51 @@ public function dpbe_deactivate_plugins() {
 
  public function dpbe_save_settings() {
   if (!current_user_can('manage_options')) {
-      return;
+   return;
   }
 
   // Verify nonce
   if (!isset($_POST['_wpnonce']) || !wp_verify_nonce($_POST['_wpnonce'], PLUGIN_PREFIX . 'save_settings_nonce')) {
-      wp_die(__('Nonce verification failed.', 'disable-plugin-by-environment'));
+   wp_die(__('Nonce verification failed.', 'disable-plugin-by-environment'));
   }
 
   $options = isset($_POST[PLUGIN_PREFIX . 'plugin_activation_status']) ? $_POST[PLUGIN_PREFIX . 'plugin_activation_status'] : array();
 
-  // Sanitize the input
-  $environments = isset($_POST[PLUGIN_PREFIX . 'environments']) ? sanitize_textarea_field($_POST[PLUGIN_PREFIX . 'environments']) : '';
-  $options['environments'] = $environments;
+  // Validate the environments textarea input
+  $environments = isset($_POST[PLUGIN_PREFIX . 'environments']) ? $_POST[PLUGIN_PREFIX . 'environments'] : '';
+  $environments_array = explode("\n", trim($environments));
+  $valid = true;
+  $url_pattern = '/\bhttps?:\/\/[^\s\/$.?#].[^\s]*$/i';
+
+  foreach ($environments_array as $env) {
+   $env = trim($env);
+   if (!empty($env) && !preg_match($url_pattern, $env)) {
+    $valid = false;
+    break;
+   }
+  }
+
+  if (!$valid) {
+   // Redirect with an error message
+   $redirect_url = add_query_arg(
+    array(
+     'page' => PLUGIN_SLUG,
+     'status' => 'error'
+    ),
+    admin_url('options-general.php')
+   );
+   wp_redirect($redirect_url);
+   exit;
+  }
+
+  // Sanitize and save the validated URLs
+  $sanitized_urls = array_map('sanitize_textarea_field', $environments_array);
+  $options['environments'] = implode("\n", $sanitized_urls);
 
   if (isset($options['deactivated_plugins'])) {
-      foreach ($options['deactivated_plugins'] as $plugin_file => $value) {
-          $options['deactivated_plugins'][$plugin_file] = $value ? 1 : 0;
-      }
+   foreach ($options['deactivated_plugins'] as $plugin_file => $value) {
+    $options['deactivated_plugins'][$plugin_file] = $value ? 1 : 0;
+   }
   }
 
   // Update the options in the database
@@ -152,16 +181,16 @@ public function dpbe_deactivate_plugins() {
 
   // Redirect back to the settings page with a success message
   $redirect_url = add_query_arg(
-      array(
-          'page' => PLUGIN_SLUG,
-          'status' => 'success'
-      ),
-      admin_url('options-general.php')
+    array(
+     'page' => PLUGIN_SLUG,
+     'status' => 'success'
+    ),
+    admin_url('options-general.php')
   );
 
   wp_redirect($redirect_url);
   exit;
-    }
+ }
 }
 
 Disable_Plugin_By_Env::init();
