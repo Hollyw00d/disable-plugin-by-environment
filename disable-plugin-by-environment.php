@@ -23,34 +23,8 @@ define('PLUGIN_PREFIX', 'dpbe_');
 class Disable_Plugin_By_Env {
 
     public function init() {
-        add_action('admin_init', array($this, PLUGIN_PREFIX . 'register_settings'));
         add_action('admin_menu', array($this, PLUGIN_PREFIX . 'settings_page'));
-    }
-
-    public function dpbe_register_settings() {
-        // Register the setting and the validation callback
-        register_setting(
-            PLUGIN_PREFIX . 'example_plugin_options',    // Option group
-            PLUGIN_PREFIX . 'example_plugin_options',    // Option name in the database
-            array($this, PLUGIN_PREFIX . 'example_plugin_options_validate') // Validation callback
-        );
-
-        // Add the settings section
-        add_settings_section(
-            'api_settings',                    // Section ID
-            'API Settings',                    // Title of the section
-            array($this, PLUGIN_PREFIX . 'plugin_section_text'),  // Callback to output the description
-            PLUGIN_PREFIX . 'example_plugin'               // Page on which the section appears
-        );
-
-        // Add the settings field
-        add_settings_field(
-            PLUGIN_PREFIX . 'plugin_setting_api_key',      // Field ID
-            'API Key',                         // Field title
-            array($this, PLUGIN_PREFIX . 'plugin_setting_api_key'),  // Callback to output the form field
-            PLUGIN_PREFIX . 'example_plugin',              // Page on which the field appears
-            'api_settings'                     // Section in which the field appears
-        );
+        add_action('admin_post_' . PLUGIN_PREFIX . 'save_settings', array($this, PLUGIN_PREFIX . 'save_settings'));
     }
 
     public function dpbe_settings_page() {
@@ -66,45 +40,64 @@ class Disable_Plugin_By_Env {
     public function dpbe_settings_page_html() {
         if (!current_user_can('manage_options')) return;
 
-        $options = get_option(PLUGIN_PREFIX . 'example_plugin_options');
-
-        print_r($options);
+        $options = get_option(PLUGIN_PREFIX . 'plugin_activation_status');
         ?>
         <div class="wrap">
-
-
             <h2><?php echo PLUGIN_NAME; ?></h2>
-            <form action="options.php" method="post">
-                <?php 
-                settings_fields(PLUGIN_PREFIX . 'example_plugin_options');
-                do_settings_sections(PLUGIN_PREFIX . 'example_plugin');
-                ?>
+            <?php if (isset($_GET['status']) && $_GET['status'] == 'success'): ?>
+                <div id="message" class="updated notice notice-success is-dismissible">
+                    <p><?php _e('Settings saved successfully.'); ?></p>
+                </div>
+            <?php endif; ?>
+            <form action="<?php echo esc_url(admin_url('admin-post.php')); ?>" method="post">
+                <input name="submit" class="button button-primary" type="submit" value="<?php esc_attr_e('Save'); ?>" />
+                <input type="hidden" name="action" value="<?php echo PLUGIN_PREFIX . 'save_settings'; ?>">
+                <?php wp_nonce_field(PLUGIN_PREFIX . 'save_settings_nonce'); ?>
+                <?php $this->dpbe_plugin_activation_state($options); ?>
                 <input name="submit" class="button button-primary" type="submit" value="<?php esc_attr_e('Save'); ?>" />
             </form>
         </div>
         <?php
     }
 
-    public function dpbe_plugin_section_text() {
-        echo '<p>Here you can set all the options for using the API.</p>';
+    public function dpbe_plugin_activation_state($options) {
+        $plugins_arr = get_plugins();
+
+        foreach ($plugins_arr as $plugin_file => $plugin_data) {
+            $checked = isset($options['plugins'][$plugin_file]) && $options['plugins'][$plugin_file] ? 'checked="checked"' : '';
+            echo "<p><label><input id='" . PLUGIN_PREFIX . "plugin_activation_status' name='" . PLUGIN_PREFIX . "plugin_activation_status[plugins][" . esc_attr($plugin_file) . "]' type='checkbox' value='1' $checked /> " . esc_html($plugin_data['Name']) . "</label></p>";
+        }
     }
 
-    public function dpbe_plugin_setting_api_key() {
-        $options = get_option(PLUGIN_PREFIX . 'example_plugin_options');
-        $api_key = isset($options['api_key']) ? $options['api_key'] : '';
-        echo "<input id='" . PLUGIN_PREFIX . "plugin_setting_api_key' name='"  . PLUGIN_PREFIX .  "example_plugin_options[api_key]' type='text' value='" . esc_attr($api_key) . "' />";
-    }
+    public function dpbe_save_settings() {
+        if (!current_user_can('manage_options')) return;
 
-    public function dpbe_example_plugin_options_validate($input) {
-        $newinput = array();
-        $newinput['api_key'] = trim($input['api_key']);
-
-        // Validate the API key (for example, a 32-character alphanumeric string)
-        if (!preg_match('/^[a-z0-9]{4}$/i', $newinput['api_key'])) {
-            $newinput['api_key'] = ''; // Clear the input if it's not valid
+        // Verify nonce
+        if (!isset($_POST['_wpnonce']) || !wp_verify_nonce($_POST['_wpnonce'], PLUGIN_PREFIX . 'save_settings_nonce')) {
+            wp_die(__('Nonce verification failed.', 'disable-plugin-by-environment'));
         }
 
-        return $newinput;
+        $options = isset($_POST[PLUGIN_PREFIX . 'plugin_activation_status']) ? $_POST[PLUGIN_PREFIX . 'plugin_activation_status'] : array();
+
+        // Sanitize the input
+        foreach ($options['plugins'] as $plugin_file => $value) {
+            $options['plugins'][$plugin_file] = $value ? 1 : 0;
+        }
+
+        // Update the options in the database
+        update_option(PLUGIN_PREFIX . 'plugin_activation_status', $options);
+
+        // Redirect back to the settings page with a success message
+        $redirect_url = add_query_arg(
+            array(
+                'page' => PLUGIN_SLUG,
+                'status' => 'success'
+            ),
+            admin_url('options-general.php')
+        );
+
+        wp_redirect($redirect_url);
+        exit;
     }
 }
 
