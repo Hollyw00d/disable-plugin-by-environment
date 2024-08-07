@@ -22,24 +22,31 @@ define('PLUGIN_PREFIX', 'dpbe_');
 
 class Disable_Plugin_By_Env {
  public static function init() {
-     $self = new self();
-     add_action('init', array($self, PLUGIN_PREFIX . 'deactivate_plugins'));
-     add_action('admin_menu', array($self, PLUGIN_PREFIX . 'settings_page'));
-     add_action('admin_post_' . PLUGIN_PREFIX . 'save_settings', array($self, PLUGIN_PREFIX . 'save_settings'));
+  $self = new self();
+  add_action('init', array($self, PLUGIN_PREFIX . 'deactivate_plugins'));
+  add_action('admin_menu', array($self, PLUGIN_PREFIX . 'settings_page'));
+  add_action('admin_post_' . PLUGIN_PREFIX . 'save_settings', array($self, PLUGIN_PREFIX . 'save_settings'));
  }
 
-public function dpbe_deactivate_plugins() {
- $options = get_option(PLUGIN_PREFIX . 'plugin_activation_status');
- $deactivated_plugins_keys = isset($options['deactivated_plugins']) ? array_keys($options['deactivated_plugins']) : array();
- $all_plugins = get_plugins();
- $all_plugins_keys = array_keys($all_plugins);
+ public function dpbe_deactivate_plugins() {
+  $options = get_option(PLUGIN_PREFIX . 'plugin_activation_status');
+  $environments = isset($options['environments']) && !empty($options['environments']) ? $options['environments'] : null;
+  $environments_arr = $environments ? explode("\n", trim($environments)) : null;
+  $base_url = rtrim(home_url(), '/') . '/';
+  $is_environment = $environments_arr ? in_array($base_url, $environments_arr) : null;
 
- foreach ($all_plugins_keys as $plugin_key) {
-  if (in_array($plugin_key, $deactivated_plugins_keys) && is_plugin_active($plugin_key)) {
-      deactivate_plugins($plugin_key, false, is_network_admin());
-  } elseif (!in_array($plugin_key, $deactivated_plugins_keys) && !is_plugin_active($plugin_key)) {
-      activate_plugin($plugin_key, '', is_network_admin());
-  }
+  $deactivated_plugins_keys = isset($options['deactivated_plugins']) ? array_keys($options['deactivated_plugins']) : array();
+  $all_plugins = get_plugins();
+  $all_plugins_keys = array_keys($all_plugins);
+
+  if($is_environment) {
+   foreach ($all_plugins_keys as $plugin_key) {
+    if (in_array($plugin_key, $deactivated_plugins_keys) && is_plugin_active($plugin_key)) {
+     deactivate_plugins($plugin_key, false, is_network_admin());
+    } elseif (!in_array($plugin_key, $deactivated_plugins_keys) && !is_plugin_active($plugin_key)) {
+     activate_plugin($plugin_key, '', is_network_admin());
+    }
+   }
   }
  }
 
@@ -69,7 +76,7 @@ public function dpbe_deactivate_plugins() {
     </div>
    <?php elseif (isset($_GET['status']) && $_GET['status'] == 'error'): ?>
     <div id="message" class="error notice notice-error is-dismissible">
-        <p><?php _e('Invalid input. Please ensure each line contains a full URL.', 'disable-plugin-by-environment'); ?></p>
+     <p><?php _e('Invalid input. Please ensure each line contains a full URL.', 'disable-plugin-by-environment'); ?></p>
     </div>
    <?php endif; ?>
 
@@ -181,11 +188,11 @@ public function dpbe_deactivate_plugins() {
 
   // Redirect back to the settings page with a success message
   $redirect_url = add_query_arg(
-    array(
-     'page' => PLUGIN_SLUG,
-     'status' => 'success'
-    ),
-    admin_url('options-general.php')
+   array(
+    'page' => PLUGIN_SLUG,
+    'status' => 'success'
+   ),
+   admin_url('options-general.php')
   );
 
   wp_redirect($redirect_url);
