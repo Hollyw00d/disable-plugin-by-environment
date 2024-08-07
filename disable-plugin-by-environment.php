@@ -43,29 +43,37 @@ class Disable_Plugin_By_Env {
         $options = get_option(PLUGIN_PREFIX . 'plugin_activation_status');
         ?>
         <div class="wrap">
-            <h2><?php echo PLUGIN_NAME; ?></h2>
-            <?php if (isset($_GET['status']) && $_GET['status'] == 'success'): ?>
-                <div id="message" class="updated notice notice-success is-dismissible">
-                    <p><?php _e('Settings saved successfully.'); ?></p>
-                </div>
-            <?php endif; ?>
-            <form action="<?php echo esc_url(admin_url('admin-post.php')); ?>" method="post">
-                <input name="submit" class="button button-primary" type="submit" value="<?php esc_attr_e('Save'); ?>" />
-                <input type="hidden" name="action" value="<?php echo PLUGIN_PREFIX . 'save_settings'; ?>">
-                <?php wp_nonce_field(PLUGIN_PREFIX . 'save_settings_nonce'); ?>
-                <?php $this->dpbe_plugin_activation_state($options); ?>
-                <input name="submit" class="button button-primary" type="submit" value="<?php esc_attr_e('Save'); ?>" />
-            </form>
+         <h2><?php echo PLUGIN_NAME; ?></h2>
+         <?php
+         echo '<pre>';
+         echo print_r($options);
+         echo '</pre>';
+         ?>
+
+         <?php if (isset($_GET['status']) && $_GET['status'] == 'success'): ?>
+             <div id="message" class="updated notice notice-success is-dismissible">
+                 <p><?php _e('Settings saved successfully.'); ?></p>
+             </div>
+         <?php endif; ?>
+         <form action="<?php echo esc_url(admin_url('admin-post.php')); ?>" method="post">
+             <input name="submit" class="button button-primary" type="submit" value="<?php esc_attr_e('Save'); ?>" />
+
+             <input type="hidden" name="action" value="<?php echo PLUGIN_PREFIX . 'save_settings'; ?>">
+             <?php wp_nonce_field(PLUGIN_PREFIX . 'save_settings_nonce'); ?>
+             <?php $this->dpbe_plugin_activation_state($options); ?>
+
+             <input name="submit" class="button button-primary" type="submit" value="<?php esc_attr_e('Save'); ?>" />
+         </form>
         </div>
         <?php
     }
 
     public function dpbe_plugin_activation_state($options) {
-        $plugins_arr = get_plugins();
+        $deactivated_plugins_arr = get_plugins();
 
-        foreach ($plugins_arr as $plugin_file => $plugin_data) {
-            $checked = isset($options['plugins'][$plugin_file]) && $options['plugins'][$plugin_file] ? 'checked="checked"' : '';
-            echo "<p><label><input id='" . PLUGIN_PREFIX . "plugin_activation_status' name='" . PLUGIN_PREFIX . "plugin_activation_status[plugins][" . esc_attr($plugin_file) . "]' type='checkbox' value='1' $checked /> " . esc_html($plugin_data['Name']) . "</label></p>";
+        foreach ($deactivated_plugins_arr as $plugin_file => $plugin_data) {
+            $checked = isset($options['deactivated_plugins'][$plugin_file]) && $options['deactivated_plugins'][$plugin_file] ? 'checked="checked"' : '';
+            echo "<p><label><input id='" . PLUGIN_PREFIX . "plugin_activation_status' name='" . PLUGIN_PREFIX . "plugin_activation_status[deactivated_plugins][" . esc_attr($plugin_file) . "]' type='checkbox' value='1' $checked /> " . esc_html($plugin_data['Name']) . "</label></p>";
         }
     }
 
@@ -80,8 +88,8 @@ class Disable_Plugin_By_Env {
         $options = isset($_POST[PLUGIN_PREFIX . 'plugin_activation_status']) ? $_POST[PLUGIN_PREFIX . 'plugin_activation_status'] : array();
 
         // Sanitize the input
-        foreach ($options['plugins'] as $plugin_file => $value) {
-            $options['plugins'][$plugin_file] = $value ? 1 : 0;
+        foreach ($options['deactivated_plugins'] as $plugin_file => $value) {
+            $options['deactivated_plugins'][$plugin_file] = $value ? 1 : 0;
         }
 
         // Update the options in the database
